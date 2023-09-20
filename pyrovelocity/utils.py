@@ -4,8 +4,6 @@ import pdb
 from inspect import getmembers
 from pprint import pprint
 from types import FunctionType
-from typing import Any
-from typing import Dict
 from typing import Tuple
 
 import anndata
@@ -24,6 +22,8 @@ from termcolor import colored
 from torch.nn.functional import relu
 from torch.nn.functional import softmax
 from torch.nn.functional import softplus
+#from scipy.integrate import odeint
+from torchdiffeq import odeint
 
 
 def trace(func):
@@ -187,6 +187,49 @@ def ode_mRNA(tau, u0, s0, alpha, beta, gamma):
     return ut, st
 
 
+# Define sigmoid function
+def sigmoid(x):
+    return 1 / (1 + torch.exp(-x))
+
+# Define raw pulse function
+def single_pulse(t, params):
+    w = params[:,0]
+    a1 = params[:,1]
+    b1 = params[:,2]
+    a2 = params[:,3]
+    b2 = params[:,4]
+    return w*(sigmoid(a1 * (t - b1)) - sigmoid(a2 * (t - (b1+b2))))
+
+# Define alpha as a weighted sum of normalized_pulse functions
+def alpha_t(t, params):
+    #return torch.sum([raw_pulse(t, *p) for p in params], axis=0)
+    return single_pulse(t, params) 
+
+# Define the system of ODEs
+def ODE_system(t, y, params, beta, gamma):
+    u,s = y
+    alpha = alpha_t(t, params)
+    du_dt = alpha - beta * u
+    ds_dt = beta * u - gamma * s
+    return [du_dt, ds_dt]
+
+def mRNA_ODE(t, u0, s0, params, beta, gamma):
+    t_steps = torch.linspace(0, 20, 200).to(t.device)
+    from functools import partial
+    ODE_system_with_params = partial(ODE_system, params=params, beta=beta, gamma=gamma)
+    solution = odeint(ODE_system_with_params, (u0, s0), t_steps)
+    u_steps = solution[0]
+    s_steps = solution[1]
+    nearest_indices = []
+    for t_c in t:
+        absolute_diff = torch.abs(t_steps - t_c)
+        nearest_index = torch.argmin(absolute_diff)
+        nearest_indices.append(nearest_index)
+    ut = u_steps[nearest_indices]
+    st = s_steps[nearest_indices]
+    return ut, st 
+
+
 def mRNA(
     tau: torch.Tensor,
     u0: torch.Tensor,
@@ -244,7 +287,6 @@ def mRNA(
     # solution 3: do not use AutoDelta and map_estimate? customize guide function?
     # use solution 3 with st2
     return ut, st
-
 
 def tau_inv(u=None, s=None, u0=None, s0=None, alpha=None, beta=None, gamma=None):
     """
@@ -887,47 +929,3 @@ def anndata_counts_to_df(adata):
         max_spliced,
         max_unspliced,
     )
-
-
-def _get_fn_args_from_batch(
-    tensor_dict: Dict[str, torch.Tensor]
-) -> Tuple[
-    Tuple[
-        torch.Tensor,
-        torch.Tensor,
-        torch.Tensor,
-        torch.Tensor,
-        torch.Tensor,
-        torch.Tensor,
-        torch.Tensor,
-        torch.Tensor,
-        torch.Tensor,
-        None,
-        None,
-    ],
-    Dict[Any, Any],
-]:
-    u_obs = tensor_dict["U"]
-    s_obs = tensor_dict["X"]
-    u_log_library = tensor_dict["u_lib_size"]
-    s_log_library = tensor_dict["s_lib_size"]
-    u_log_library_mean = tensor_dict["u_lib_size_mean"]
-    s_log_library_mean = tensor_dict["s_lib_size_mean"]
-    u_log_library_scale = tensor_dict["u_lib_size_scale"]
-    s_log_library_scale = tensor_dict["s_lib_size_scale"]
-    ind_x = tensor_dict["ind_x"].long().squeeze()
-    cell_state = tensor_dict.get("pyro_cell_state")
-    time_info = tensor_dict.get("time_info")
-    return (
-        u_obs,
-        s_obs,
-        u_log_library,
-        s_log_library,
-        u_log_library_mean,
-        s_log_library_mean,
-        u_log_library_scale,
-        s_log_library_scale,
-        ind_x,
-        cell_state,
-        time_info,
-    ), {}

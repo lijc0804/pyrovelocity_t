@@ -400,7 +400,7 @@ def compute_volcano_data(
     assert isinstance(posterior_samples, (tuple, list))
     assert isinstance(adata, (tuple, list))
     assert "s" in posterior_samples[0]
-    assert "alpha" in posterior_samples[0]
+    assert "beta" in posterior_samples[0]
 
     maes_list = []
     cors = []
@@ -409,7 +409,7 @@ def compute_volcano_data(
     switching = []
     for p, ad, label in zip(posterior_samples, adata, ["train", "valid"]):
         print(label)
-        for sample in range(p["alpha"].shape[0]):
+        for sample in range(p["beta"].shape[0]):
             maes_list.append(
                 mae_per_gene(
                     p["s"][sample].squeeze(),
@@ -852,6 +852,7 @@ def plot_vector_field_uncertain(
         if not only_grid:
             # norm = Normalize()
             # norm.autoscale(adata.obs["uncertain"])
+            uncertain = adata.obs["uncertain"].values
             order = np.argsort(adata.obs["uncertain"].values)
             im = ax[0].scatter(
                 adata.obsm[f"X_{basis}"][:, 0][order],

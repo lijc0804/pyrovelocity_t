@@ -151,7 +151,12 @@ class VelocityModule(PyroBaseModuleClass):
                     poutine.block(
                         self._model,
                         expose=[
-                            "alpha",
+                            #"alpha",
+                            "alpha_w",
+                            "alpha_a1",
+                            "alpha_b1",
+                            "alpha_a2",
+                            "alpha_b2",
                             "beta",
                             "gamma",
                             "dt_switching",
@@ -172,7 +177,12 @@ class VelocityModule(PyroBaseModuleClass):
                     poutine.block(
                         self._model,
                         expose=[
-                            "alpha",
+                            #"alpha",
+                            "alpha_w",
+                            "alpha_a1",
+                            "alpha_b1",
+                            "alpha_a2",
+                            "alpha_b2",
                             "beta",
                             "gamma",
                             "dt_switching",
@@ -186,6 +196,7 @@ class VelocityModule(PyroBaseModuleClass):
                 )
             )
         self._guide = guide
+        self._get_fn_args_from_batch = self._model._get_fn_args_from_batch
 
     @property
     def model(self) -> VelocityModelAuto:
